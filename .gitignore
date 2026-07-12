@@ -1,0 +1,20 @@
+# Build output (regenerado por `idf.py build`)
+build/
+
+# Configuração gerada automaticamente a partir de sdkconfig.defaults + Kconfig.
+# Só sdkconfig.defaults deve ser versionado.
+sdkconfig
+sdkconfig.old
+
+# Componentes baixados pelo gerenciador de componentes do ESP-IDF
+# (dependencies.lock é o que importa versionar, ele é reproduzível a partir dele)
+managed_components/
+
+# Logs do idf.py
+log/
+
+.claude
+
+# Configuração do VS Code (settings.json tem caminho absoluto do ESP-IDF
+# específico desta máquina, não é portável entre computadores)
+.vscode/
