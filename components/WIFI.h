@@ -4,13 +4,11 @@
 
 #include "esp_event.h"
 
-class WifiManager {
+class WIFI {
 public:
-    WifiManager(const std::string& ssid, const std::string& senha);
+    WIFI(const std::string& ssid, const std::string& senha);
 
-    // Inicializa o Wi-Fi e bloqueia até obter IP (conforme pedido no enunciado).
     void conecta();
-
 private:
     std::string ssid_;
     std::string senha_;

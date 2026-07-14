@@ -1,4 +1,4 @@
-#include "WifiManager.h"
+#include "WIFI.h"
 
 #include <cstring>
 
@@ -9,18 +9,19 @@
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
 
-static const char* TAG = "WifiManager";
+#define TAG "WIFI"
+#define WIFI_CONECTADO_BIT BIT0
 static EventGroupHandle_t s_eventGroup = nullptr;
-static constexpr int WIFI_CONECTADO_BIT = BIT0;
 
-WifiManager::WifiManager(const std::string& ssid, const std::string& senha)
+WIFI::WIFI(const std::string& ssid, const std::string& senha)
     : ssid_(ssid), senha_(senha) {}
 
-void WifiManager::eventoHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+void WIFI::eventoHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        ESP_LOGW(TAG, "Wi-Fi desconectado, tentando reconectar...");
+        auto* evento = static_cast<wifi_event_sta_disconnected_t*>(event_data);
+        ESP_LOGW(TAG, "Wi-Fi desconectado (motivo=%d), tentando reconectar...", evento->reason);
         esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         auto* evento = static_cast<ip_event_got_ip_t*>(event_data);
@@ -29,9 +30,7 @@ void WifiManager::eventoHandler(void* arg, esp_event_base_t event_base, int32_t 
     }
 }
 
-void WifiManager::conecta() {
-    // TODO: mover a inicialização do NVS para um ponto único do programa
-    // caso outras partes do sistema também dependam dele.
+void WIFI::conecta() {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -49,9 +48,9 @@ void WifiManager::conecta() {
     ESP_ERROR_CHECK(esp_wifi_init(&cfgInit));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        WIFI_EVENT, ESP_EVENT_ANY_ID, &WifiManager::eventoHandler, nullptr, &instanciaWifiEvent_));
+        WIFI_EVENT, ESP_EVENT_ANY_ID, &WIFI::eventoHandler, nullptr, &instanciaWifiEvent_));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        IP_EVENT, IP_EVENT_STA_GOT_IP, &WifiManager::eventoHandler, nullptr, &instanciaIpEvent_));
+        IP_EVENT, IP_EVENT_STA_GOT_IP, &WIFI::eventoHandler, nullptr, &instanciaIpEvent_));
 
     wifi_config_t cfg = {};
     std::strncpy(reinterpret_cast<char*>(cfg.sta.ssid), ssid_.c_str(), sizeof(cfg.sta.ssid) - 1);
@@ -61,16 +60,8 @@ void WifiManager::conecta() {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    // Reduz a potência de transmissão para diminuir os picos de corrente do
-    // rádio Wi-Fi, que sem resistor de pull-up externo no sensor 1-Wire
-    // provocam quedas de tensão suficientes para corromper a leitura.
-    // 34 (unidades de 0.25dBm) ~= 8.5dBm. Ajuste para cima se o sinal cair
-    // demais para o seu roteador.
     esp_wifi_set_max_tx_power(34);
 
-    // WIFI_PS_MAX_MODEM enfileira pacotes e os entrega em rajadas quando o
-    // rádio acorda, o que atrapalha ainda mais as janelas de leitura do
-    // sensor. Sem economia de energia o tráfego fica mais constante/previsível.
     esp_wifi_set_ps(WIFI_PS_NONE);
 
     ESP_LOGI(TAG, "Conectando ao Wi-Fi '%s'...", ssid_.c_str());
